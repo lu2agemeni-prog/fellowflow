@@ -9,16 +9,45 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Spinner } from '@/components/ui/spinner';
 import { Eye, EyeOff, Mail, Lock, Stethoscope } from 'lucide-react';
+import { supabase } from '@/lib/supabase'; // تم إضافة الاستيراد للتحقق من الرتبة
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { signIn } = useAuth();
+  const { signIn, refreshUser } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // دالة موحدة للتوجيه بناءً على الرتبة لتجنب التعليق في صفحة الـ Loading
+  const redirectBasedOnRole = async (userEmail: string) => {
+    try {
+      // جلب بيانات البروفايل للتحقق من الرتبة
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('email', userEmail)
+        .single();
+
+      if (profileError || !profile) {
+        navigate('/dashboard'); // المسار الافتراضي
+        return;
+      }
+
+      // التوجيه للمسار المتوافق مع صلاحيات App.tsx
+      if (profile.role === 'admin' || profile.role === 'super_admin') {
+        navigate('/admin');
+      } else if (profile.role === 'trainer') {
+        navigate('/trainer');
+      } else {
+        navigate('/dashboard');
+      }
+    } catch (err) {
+      navigate('/dashboard');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,7 +59,8 @@ export const Login: React.FC = () => {
       if (error) {
         setError(error.message || 'فشل تسجيل الدخول. يرجى التحقق من بياناتك.');
       } else {
-        navigate('/dashboard');
+        await refreshUser(); // تحديث حالة المستخدم في الـ Context
+        await redirectBasedOnRole(email);
       }
     } catch (err) {
       setError('حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.');
@@ -39,7 +69,6 @@ export const Login: React.FC = () => {
     }
   };
 
-  // Demo login for testing
   const handleDemoLogin = async (role: string) => {
     setLoading(true);
     const demoEmails: Record<string, string> = {
@@ -47,9 +76,15 @@ export const Login: React.FC = () => {
       trainer: 'trainer@example.com',
       admin: 'admin@example.com',
     };
-    const { error } = await signIn(demoEmails[role], 'password123');
+    
+    const email = demoEmails[role];
+    const { error } = await signIn(email, 'password123');
+    
     if (!error) {
-      navigate('/dashboard');
+      await refreshUser();
+      await redirectBasedOnRole(email);
+    } else {
+      setError('فشل الدخول التجريبي.');
     }
     setLoading(false);
   };
@@ -57,7 +92,6 @@ export const Login: React.FC = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
       <div className="w-full max-w-md">
-        {/* Logo */}
         <div className="flex flex-col items-center mb-8">
           <div className="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
             <Stethoscope className="w-10 h-10 text-white" />
@@ -138,37 +172,21 @@ export const Login: React.FC = () => {
               </div>
 
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? <Spinner className="mr-2" /> : null}
-                تسجيل الدخول
+                {loading ? <Spinner className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {loading ? 'جاري التحقق...' : 'تسجيل الدخول'}
               </Button>
             </form>
 
-            {/* Demo Login Buttons */}
             <div className="mt-6 pt-6 border-t border-gray-200">
               <p className="text-sm text-gray-500 text-center mb-3">تسجيل الدخول التجريبي</p>
               <div className="grid grid-cols-3 gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDemoLogin('trainee')}
-                  disabled={loading}
-                >
+                <Button variant="outline" size="sm" onClick={() => handleDemoLogin('trainee')} disabled={loading}>
                   متدرب
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDemoLogin('trainer')}
-                  disabled={loading}
-                >
+                <Button variant="outline" size="sm" onClick={() => handleDemoLogin('trainer')} disabled={loading}>
                   مدرب
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDemoLogin('admin')}
-                  disabled={loading}
-                >
+                <Button variant="outline" size="sm" onClick={() => handleDemoLogin('admin')} disabled={loading}>
                   مدير
                 </Button>
               </div>
@@ -185,7 +203,6 @@ export const Login: React.FC = () => {
           </CardFooter>
         </Card>
 
-        {/* Footer */}
         <p className="text-center text-sm text-gray-500 mt-8">
           © 2024 FellowFlow. جميع الحقوق محفوظة.
         </p>
