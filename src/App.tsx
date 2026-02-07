@@ -19,6 +19,8 @@ const ProtectedRoute: React.FC<{
 }> = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
 
+  console.log('ProtectedRoute - Loading:', loading, 'User:', user);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -28,10 +30,12 @@ const ProtectedRoute: React.FC<{
   }
 
   if (!user) {
+    console.log('No user, redirecting to login');
     return <Navigate to="/login" replace />;
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
+    console.log('User role not allowed, redirecting based on role:', user.role);
     // Redirect to appropriate dashboard based on role
     if (user.role === 'admin' || user.role === 'super_admin') {
       return <Navigate to="/admin" replace />;
@@ -42,12 +46,15 @@ const ProtectedRoute: React.FC<{
     }
   }
 
+  console.log('Access granted for user:', user.full_name, 'Role:', user.role);
   return <>{children}</>;
 };
 
 // Role-based Dashboard Redirect
 const DashboardRedirect: React.FC = () => {
   const { user, loading } = useAuth();
+
+  console.log('DashboardRedirect - Loading:', loading, 'User:', user);
 
   if (loading) {
     return (
@@ -58,9 +65,12 @@ const DashboardRedirect: React.FC = () => {
   }
 
   if (!user) {
+    console.log('No user in DashboardRedirect, going to login');
     return <Navigate to="/login" replace />;
   }
 
+  console.log('Redirecting user based on role:', user.role);
+  
   switch (user.role) {
     case 'admin':
     case 'super_admin':
